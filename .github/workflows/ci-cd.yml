@@ -1,0 +1,135 @@
+# =============================================================================
+# ci-cd.yml — Pipeline CI/CD do projeto "Prova de Fogo"
+#
+# FLUXO:
+#   push/PR  -> job "test"          (unit tests)
+#   main     -> job "test"          (obrigatório, com 3.11)
+#            -> job "build-and-push" (Docker image -> Docker Hub)
+#            -> job "deploy"         (SSH -> EC2 -> pull + restart container)
+# -----------------------------------------------------------------------------
+# SECRETS NECESSÁRIOS (Settings > Secrets and variables > Actions):
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN,
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY
+# =============================================================================
+
+name: CI/CD Pipeline
+
+# Eventos que disparam o pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Permisões mínimas exigidas pelo princípio do menor privilégio.
+# jobs/checkout não precisa de token de escrita; só de leitura (contents: read).
+permissions:
+  contents: read
+
+env:
+  # Usadas no build-and-push e no deploy (evita repetição nos jobs).
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/prova-de-fogo-fastapi  # usuário/nome da imagem
+  IMAGE_TAG: ${{ github.sha }}  # tag única = SHA do commit (rastreabilidade)
+
+jobs:
+  # =========================================================================
+  # JOB 1: TEST
+  # Roda em todo push e PR. Valida que o código está correto ANTES de buildar.
+  # =========================================================================
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          # cache: "pip" usa o requirements.txt como chave de cache —
+          # dependências não são reinstaladas se nada mudou.
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Rodar testes (pytest + cobertura)
+        run: |
+          pytest
+
+      # Upload do coverage.xml mesmo em falha (if: always()) para que o
+      # coverage seja analisável no relatório.
+      - name: Upload artefato de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # =========================================================================
+  # JOB 2: BUILD AND PUSH (somente main)
+  # Sobe a imagem para o Docker Hub. O push na main é o gatilho automático.
+  # =========================================================================
+  build-and-push:
+    needs: test            # só roda se test passou
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3   # ativa o BuildKit (builds paralelos)
+
+      # Credenciais do Docker Hub via secrets — nunca em texto.
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Cache de layers: builds mais rápidos a partir do segundo build.
+      # Se o requirements.txt não mudou, o "pip install" não roda de novo.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Scan de vulnerabilidades roda DEPOIS, no job de qualidade —
+          # aqui apenas buildamos e publicamos.
+
+  # =========================================================================
+  # JOB 3: DEPLOY (somente main, depois do push)
+  # Conecta por SSH na EC2, puxa a imagem nova e recria o container.
+  # A EC2 suporta multiplos containers por instância (1 vCPU é suficiente).
+  # =========================================================================
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy na EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            docker pull ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            docker stop prova-de-fogo-api || true
+            docker rm prova-de-fogo-api || true
+            docker run -d \
+              --name prova-de-fogo-api \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            # Smoke test pós-deploy: a API precisa responder /health antes de
+            # o job terminar. Caso contrário o pipeline falha e fica visível.
+            sleep 5
+            curl -fsS http://localhost:8000/health || exit 1

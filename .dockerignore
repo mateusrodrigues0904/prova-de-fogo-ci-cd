@@ -1,0 +1,46 @@
+# =============================================================================
+# .dockerignore — o que o Docker NÃO envia como build context.
+# Sem isto, o context vira o diretório inteiro (venv, .git...) —
+# o build fica lento e a imagem pode herdar secrets/arquivos indevidos.
+# =============================================================================
+
+# Controle de versão / meta
+.git
+.gitignore
+.gitattributes
+
+# Python
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+
+# Testes e ferramentas de dev (NÃO entram na imagem de produção)
+tests
+pytest.ini
+.coverage
+coverage.xml
+htmlcov
+.pre-commit-config.yaml
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Documentação
+README.md
+
+# Terraform (provê infra, não código da API)
+terraform
+
+# Secretos — NUNCA envie ao build
+*.pem
+*.key
+secrets/*
+.env*
+docker-compose*.yml
