@@ -19,7 +19,9 @@
       <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-blue" alt="Licença MIT">
     </a>
     <img src="https://img.shields.io/badge/Python-3.11-blueviolet" alt="Python 3.11">
-    <img src="https://img.shields.io/badge/Cobertura-95%25-success" alt="Cobertura 95%">
+    <a href="https://codecov.io/gh/mateusrodrigues0904/prova-de-fogo-ci-cd">
+      <img src="https://img.shields.io/codecov/c/github/mateusrodrigues0904/prova-de-fogo-ci-cd" alt="Cobertura de testes">
+    </a>
   </p>
 </div>
 
@@ -176,11 +178,29 @@ O workflow `.github/workflows/ci-cd.yml` tem 3 jobs encadeados:
 - Smoke test pós-deploy como verificação de qualidade do release.
 
 **Próximos passos:**
-- [ ] Terraform para provisionar a EC2 (Elastic IP incluído)
-- [ ] Scan de vulnerabilidades com **Trivy** no pipeline
-- [ ] Badge de cobertura no README (**Codecov**)
+- [x] Terraform para provisionar a EC2 (Elastic IP incluso)
+- [x] Scan de vulnerabilidades com **Trivy** no pipeline
+- [x] Badge de cobertura no README (**Codecov**)
 - [ ] Reverse proxy (Nginx) + HTTPS (Let's Encrypt) na porta 80
 - [ ] Estratégia de rollback automatizada
+- [ ] Migrar da EC2 para **ECS Fargate** (containers gerenciados)
+
+---
+
+## 🛰️ Infraestrutura como código (Terraform)
+
+O diretório `terraform/` provisiona toda a infraestrutura da EC2 —
+Security Group (SSH + API), par de chaves, instância `t2.micro` e um
+**Elastic IP** (IP público fixo, não muda ao parar/ligar a instância).
+
+```bash
+cd terraform
+terraform init
+terraform apply -auto-approve
+```
+
+Os outputs finais mostram o IP fixo e a URL da API prontos para usar no
+secret `EC2_HOST`. Requisito: usuário IAM com `AmazonEC2FullAccess`.
 
 ---
 

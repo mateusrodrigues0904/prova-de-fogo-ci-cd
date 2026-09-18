@@ -42,8 +42,8 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description="API de exemplo para demonstrar um pipeline CI/CD completo.",
-        docs_url="/docs",           # Swagger UI disponível por padrão
-        redoc_url="/redoc",         # ReDoc alternativo
+        docs_url="/docs",  # Swagger UI disponível por padrão
+        redoc_url="/redoc",  # ReDoc alternativo
         lifespan=lifespan,
     )
 

@@ -1,0 +1,39 @@
+# =============================================================================
+# Pre-commit hooks — garantias automaticas ANTES de todo commit.
+#
+# Instalar:   pip install pre-commit && pre-commit install
+# Rodar:      pre-commit run --all-files
+# Atualizar:  pre-commit autoupdate
+# =============================================================================
+repos:
+  # Correcoes automaticas de whitespace e fim de arquivo
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=500"] # bloqueia arquivos grandes (ex.: .pem por engano)
+      - id: check-merge-conflict
+
+  # isort: ordena imports -> toca código X, commits atomicos
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--filter-files"]
+
+  # black: formatador oficial -> padrão consistente em todo o repo
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  # flake8: linter de boas práticas (linhas longas, imports nao usados...)
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        additional_dependencies: [flake8-bugbear]

@@ -40,7 +40,7 @@ def test_hello_nome_valido(client: TestClient) -> None:
 
 def test_hello_nome_com_espacos_e_aspas(client: TestClient) -> None:
     """Nomes com espaços ou aspas extras devem ser tratados."""
-    response = client.get('/hello/%22%20Maria%20%22')
+    response = client.get("/hello/%22%20Maria%20%22")
     assert response.status_code == 200
     assert "Maria" in response.json()["message"]
 
