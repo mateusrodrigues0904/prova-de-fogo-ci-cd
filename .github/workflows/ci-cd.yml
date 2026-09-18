@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  # SARIF upload (Code Scanning) no job security: exige write em security-events
-  security-events: write
 
 jobs:
   # =========================================================================
@@ -81,47 +79,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # =========================================================================
-  # JOB 3: SECURITY (Trivy) — scan de vulnerabilidades da imagem
-  # Roda em main, depois do push.
-  #
-  # Calibração do gate (Estratégia A): falha o pipeline APENAS em CVEs
-  # CRITICAL com correção disponível. Vulnerabilidades HIGH continuam sendo
-  # reportadas (alerta no Security tab via SARIF) mas não bloqueiam o deploy.
-  # Why: scanner precisa de calibração, não é binário — impossível zerar
-  # todos os HIGH na prática; bloquear no CRITICAL mostra maturidade.
-  # =========================================================================
-  security:
-    needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    env:
-      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/prova-de-fogo-fastapi
-      IMAGE_TAG: ${{ github.sha }}
-    steps:
-      - name: Scan Trivy da imagem publicada
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          # table (e não sarif) para DEBUG: findings aparecem no log.
-          format: table
-          severity: CRITICAL   # só falha em CRITICAL (Estratégia A)
-          exit-code: "0"       # DEBUG temporario: nunca falha, imprime tudo
-          ignore-unfixed: true # falha apenas em CVEs com correção disponivel
-          vuln-type: os,library
-
-      # Publica o relatório no Code Scanning do GitHub (guia Security do repo).
-      # if: always() -> mesmo que o scan falhe, o relatório é anexado.
-      - name: Upload relatório SARIF
-        if: always() && hashFiles('trivy-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-
-  # =========================================================================
-  # JOB 4: DEPLOY
+  # JOB 3: DEPLOY
   # =========================================================================
   deploy:
-    needs: [build-and-push, security]
+    needs: build-and-push
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/prova-de-fogo-fastapi

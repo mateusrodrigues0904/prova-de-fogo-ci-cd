@@ -179,7 +179,6 @@ O workflow `.github/workflows/ci-cd.yml` tem 3 jobs encadeados:
 
 **Próximos passos:**
 - [x] Terraform para provisionar a EC2 (Elastic IP incluso)
-- [x] Scan de vulnerabilidades com **Trivy** no pipeline
 - [x] Badge de cobertura no README (**Codecov**)
 - [ ] Reverse proxy (Nginx) + HTTPS (Let's Encrypt) na porta 80
 - [ ] Estratégia de rollback automatizada
