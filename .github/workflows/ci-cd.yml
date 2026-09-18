@@ -114,17 +114,19 @@ jobs:
 
       # Decodifica a chave: o secret está em base64 (1 linha) para o GitHub
       # não corromper as quebras de linha do PEM durante o paste.
+      # IMPORTANTE: gravar em $GITHUB_WORKSPACE (montado em /github/workspace
+      # dentro do container do ssh-action) — /tmp do runner NÃO é visível lá.
       - name: Preparar chave SSH
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" | base64 --decode > /tmp/ec2_key
-          chmod 600 /tmp/ec2_key
+          echo "${{ secrets.EC2_SSH_KEY }}" | base64 --decode > "$GITHUB_WORKSPACE/ec2_key"
+          chmod 600 "$GITHUB_WORKSPACE/ec2_key"
 
       - name: Deploy na EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key_path: /tmp/ec2_key
+          key_path: /github/workspace/ec2_key
           script: |
             set -e
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
