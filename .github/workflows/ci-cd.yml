@@ -102,8 +102,10 @@ jobs:
           exit-code: "1"   # 1 = falha o job se achar HIGH/CRITICAL
           ignore-unfixed: true  # falha apenas em CVEs com correção disponivel
 
-      # Publica o relatório no Code Scanning do GitHub (guia Security do repo)
+      # Publica o relatório no Code Scanning do GitHub (guia Security do repo).
+      # if: always() -> mesmo que o scan falhe, o relatório é anexado.
       - name: Upload relatório SARIF
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif

@@ -45,8 +45,12 @@ COPY requirements.txt .
 # Instala as dependências de PRODUÇÃO dentro do venv.
 # pip 23+ já não tem o --no-cache-dir como obrigatório por segurança — usamos
 # --no-cache-dir para reduzir o tamanho da imagem em ~30-60MB.
+# Ao final, DESINSTALA pip/setuptools/wheel do venv: são ferramentas de build,
+# não existem em runtime de produção. Além de enxugar a imagem, remove os
+# pacotes vendored do pip (ex.: msgpack) dos findings do Trivy.
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip uninstall -y pip setuptools wheel
 
 # -----------------------------------------------------------------------------
 # ESTÁGIO 2 — RUNTIME
@@ -59,6 +63,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
     APP_ENVIRONMENT=production \
     APP_NAME=prova-de-fogo-fastapi
+
+# Patches de segurança do Debian acima da imagem base.
+# Ex.: CVEs de gzip/perl/libpcre2/libsqlite3 com correção disponivel apenas
+# via apt (a imagem publicada pode estar dias desatualizada). Isso furando a
+# imutabilidade é compensado pela redução real do risco — padrão comum em
+# times de segurança de containers. Depois de `apt upgrade`, limpamos o cache
+# para não inflar a imagem.
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Remove o site-packages do base image (/usr/local) INTEIRO: o venv /opt/venv
+# é autossuficiente (pip/setuptools/wheel próprios e atualizados).
+# O pip 24.0 vendora msgpack (falso-positivo do Trivy) e nada disso é usado
+# em produção. Menos pacotes = menos superfície e imagem menor.
+RUN rm -rf /usr/local/lib/python3.11/site-packages
 
 # Cria um usuário sem privilégios: se a aplicação for comprometida, o atacante
 # NÃO tem acesso de root dentro do container (defesa em profundidade).
